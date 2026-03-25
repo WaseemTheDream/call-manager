@@ -25,6 +25,63 @@ Optional:
 
 ---
 
+## Voice Profiles
+
+Voice profiles map use cases to specific voice IDs, settings, models, and generation techniques.
+**Always check profiles before generating voice content.** Use the default voice only when no
+profile matches the request.
+
+### Profile: Default (Ren)
+
+The agent's own voice. Use for general TTS, voice messages, briefings, and any content
+that isn't associated with a specific character or persona.
+
+| Setting | Value |
+|---|---|
+| Voice ID | `ELEVENLABS_VOICE_ID` (from config) |
+| Model | `eleven_turbo_v2_5` |
+| Stability | 0.5 |
+| Similarity boost | 0.75 |
+| Speed | 1.0 |
+| Technique | Standard (single-shot generation) |
+
+### Profile: Cloned Voice (Character Persona)
+
+Use for any content delivered in a **cloned voice** (e.g., Steve Jobs quotes, celebrity
+impressions, custom voice characters). Cloned voices require special handling — they sound
+unnatural when generated as a single long passage.
+
+| Setting | Value |
+|---|---|
+| Voice ID | `ELEVENLABS_CLONE_VOICE_ID` (from config) |
+| Model | `eleven_multilingual_v2` |
+| Stability | 0.55 |
+| Similarity boost | 0.9 |
+| Style | 0.4 |
+| Speed | 0.85 |
+| **Technique** | **Sentence-by-sentence stitching (MANDATORY)** |
+
+**⚠️ CRITICAL: Cloned voices MUST use sentence-by-sentence stitching.**
+Single-shot generation with cloned voices produces rushed pacing, inconsistent tone,
+and unnatural pauses. This was extensively tested and validated — sentence stitching
+is the only technique that produces natural-sounding output with cloned voices.
+
+### How to select a profile
+
+1. **Is this a cloned voice / character persona?** → Use **Cloned Voice** profile + sentence stitching
+2. **Is this the agent's own voice?** → Use **Default** profile + standard generation
+3. **Not sure?** → If `ELEVENLABS_CLONE_VOICE_ID` is referenced in the request, it's a clone
+
+### Adding new voice profiles
+
+Store voice profiles in TOOLS.md or the agent's credentials store. Each profile needs:
+- Voice ID
+- Model (`eleven_turbo_v2_5` for premade, `eleven_multilingual_v2` for clones)
+- Voice settings (stability, similarity_boost, style, speed)
+- Generation technique (standard or sentence-stitching)
+
+---
+
 ## Procedure: Make an Outbound Call
 
 POST to `https://api.vapi.ai/call/phone`:
@@ -145,10 +202,14 @@ Authorization: Bearer <VAPI_API_KEY>
 
 ## Procedure: Generate Voice Message (ElevenLabs TTS)
 
+**First: check Voice Profiles above** to determine the correct voice, model, settings, and technique.
+
 ### Standard TTS (single generation)
 
+Use for **premade/default voices only**. Do NOT use for cloned voices.
+
 ```bash
-curl -s "https://api.elevenlabs.io/v1/text-to-speech/$ELEVENLABS_VOICE_ID" \
+curl -s "https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID" \
   -H "xi-api-key: $ELEVENLABS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -179,20 +240,54 @@ ffmpeg -y -i message.mp3 -c:a libopus -b:a 64k -ar 48000 -ac 1 message.ogg
 
 ## Procedure: Sentence-by-Sentence Stitching
 
-For natural pacing with cloned voices, generate each sentence separately and stitch with silence gaps:
+**⚠️ MANDATORY for all cloned voices.** Do not skip this for cloned voice content.
 
-1. Split text into sentences
-2. Generate each sentence via ElevenLabs TTS API
-3. Generate silence: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 0.6 -q:a 9 -acodec libmp3lame silence.mp3`
-4. Concatenate with `ffmpeg -f concat -safe 0 -i filelist.txt -c copy output.mp3`
-5. Apply denoising: `ffmpeg -i output.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w" final.mp3`
+This technique generates each sentence separately via ElevenLabs TTS, adds silence gaps
+between them, and concatenates into a single file. It produces dramatically more natural
+pacing than single-shot generation with cloned voices.
 
-Recommended voice settings for cloned voices:
-- stability: 0.55
-- similarity_boost: 0.9
-- style: 0.4
-- speed: 0.85
-- model: `eleven_multilingual_v2`
+### Why this matters
+
+Single-shot TTS with cloned voices produces:
+- Rushed pacing toward the end of longer passages
+- Inconsistent tone across sentences
+- Unnatural pauses or no pauses at all
+- Loss of the clone's character over longer text
+
+Sentence stitching fixes all of these by giving each sentence its own generation context.
+
+### Steps
+
+1. Split text into sentences (on `.` `!` `?`)
+2. Generate each sentence via ElevenLabs TTS API with **cloned voice settings**:
+   - model: `eleven_multilingual_v2`
+   - stability: 0.55, similarity_boost: 0.9, style: 0.4, speed: 0.85
+3. Generate silence gap: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 0.6 -q:a 9 -acodec libmp3lame silence.mp3`
+4. Build file list alternating sentences and silence gaps (no silence after last sentence)
+5. Concatenate: `ffmpeg -f concat -safe 0 -i filelist.txt -c copy output.mp3`
+6. Apply denoising: `ffmpeg -i output.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w" final.mp3`
+
+### Automated script
+
+Use `scripts/stitch-sentences.sh`:
+
+```bash
+ELEVENLABS_API_KEY="<key>" \
+ELEVENLABS_VOICE_ID="<clone_voice_id>" \
+./scripts/stitch-sentences.sh "Your text here. Multiple sentences work best." output.mp3
+```
+
+Voice settings can be overridden via environment variables:
+- `TTS_MODEL` (default: `eleven_multilingual_v2`)
+- `TTS_STABILITY` (default: 0.55)
+- `TTS_SIMILARITY` (default: 0.9)
+- `TTS_STYLE` (default: 0.4)
+- `TTS_SPEED` (default: 0.85)
+
+### Rate limiting
+
+The script adds a 0.3s delay between API calls. For longer passages (10+ sentences),
+monitor ElevenLabs rate limits. The Starter plan allows ~100 requests/minute.
 
 ---
 
@@ -204,6 +299,24 @@ Recommended voice settings for cloned voices:
 4. **Fine-tune settings**: Adjust stability, similarity_boost, style, and speed
 
 See `references/voice-cloning-guide.md` for the full workflow.
+
+### Clone iteration lessons
+
+From real-world iteration on a Steve Jobs voice clone:
+
+1. **v1**: Single clip clone — recognizable but thin
+2. **v2**: Added more training clips + switched to `eleven_multilingual_v2` — much better
+3. **v3-v4**: Pacing issues (rushing at end) — fixed with punctuation, but model-level fix was limited
+4. **v5-v6**: Expanded to 5 source clips from different contexts — broader range but introduced drift
+5. **v7**: Tried SSML `<break>` tags for pauses — sounded terrible (robotic, like hitting pause on tape)
+6. **v8**: **Sentence-by-sentence stitching** with v2 settings — this was the breakthrough
+
+**Key insight**: More training clips ≠ better. A focused 2-3 clip clone with good settings often
+outperforms a 5-clip clone. The generation technique (sentence stitching) matters more than
+clone complexity for long-form content.
+
+**Final winning combination**: Sentence stitching technique + cloned voice settings
+(stability 0.55, similarity_boost 0.9, style 0.4, speed 0.85, model `eleven_multilingual_v2`).
 
 ---
 
@@ -247,6 +360,8 @@ If degraded → stop debugging, wait. Status check takes 10 seconds; config debu
 | `400 Bad Request: Unterminated string` | Smart quotes/em dashes in JSON | Sanitize text (see JSON Sanitization above) |
 | International call fails silently | Missing Twilio geo-permissions | Enable geo-permissions for target country |
 | TTS mispronounces a name | TTS phonetic interpretation | Use phonetic spelling: "Keer-in" instead of "Kieran" or similar phonetic workarounds |
+| Cloned voice sounds rushed/unnatural | Using single-shot generation | Switch to sentence-by-sentence stitching (see procedure above) |
+| Wrong voice used for character content | No voice profile check | Always check Voice Profiles section before generating |
 
 ### Known Limitations
 
@@ -255,3 +370,4 @@ If degraded → stop debugging, wait. Status check takes 10 seconds; config debu
 - **International calls**: Require Twilio geo-permissions per country
 - **Non-English voices**: English voices drift back to English quickly; use native-language voices
 - **Bot verbalizes actions**: "Hangs up" is spoken aloud instead of executed; use silence timeout instead
+- **Cloned voices degrade on long text**: Always use sentence stitching for passages longer than 1-2 sentences

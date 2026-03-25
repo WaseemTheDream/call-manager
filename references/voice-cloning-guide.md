@@ -68,16 +68,35 @@ curl -X POST "https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID" \
 5. If it sounds unstable → increase `stability` (0.5-0.7)
 6. If quality plateaus → add more training clips from different sources
 
-## Step 4: The Sentence-Stitching Breakthrough
+## Step 4: The Sentence-Stitching Breakthrough (MANDATORY for Cloned Voices)
 
-For long-form content (quotes, monologues), generating the entire text as one TTS call often produces:
+**⚠️ Always use sentence stitching for cloned voices.** This is not optional — single-shot
+generation produces consistently worse results with clones.
+
+For long-form content (quotes, monologues), generating the entire text as one TTS call produces:
 - Rushed pacing toward the end
 - Inconsistent tone across sentences
 - Unnatural pauses or no pauses at all
+- Loss of the clone's character over longer text
 
 **The fix:** Generate each sentence separately and stitch with natural silence gaps.
 
-See `scripts/stitch-sentences.sh` for the automated workflow.
+Use `scripts/stitch-sentences.sh` for the automated workflow.
+
+### Real-World Iteration Log (Steve Jobs Clone)
+
+This sequence was tested over multiple days with live human feedback:
+
+1. **v1**: Single 60s clip clone — recognizable but thin
+2. **v2**: 4 more training clips + `eleven_multilingual_v2` model — significant improvement, liked by testers
+3. **v3-v4**: Addressed pacing (rushing at end) via punctuation tweaks — marginal improvement
+4. **v5-v6**: Expanded to 5 source clips from different contexts (speeches, interviews, narration) — broader range but introduced tonal drift
+5. **v7**: SSML `<break>` tags for timed pauses — **terrible** (robotic, like hitting pause on a tape)
+6. **v8**: Sentence-by-sentence stitching with v2-era settings — **this was the breakthrough**
+
+**Winning formula:** Sentence stitching technique + focused clone + settings below.
+More training clips doesn't always mean better — a focused 2-3 clip clone with proper
+generation technique often outperforms a 5-clip clone with single-shot generation.
 
 ### Voice Settings That Work Well for Clones
 

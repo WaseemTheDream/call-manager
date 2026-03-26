@@ -107,7 +107,7 @@ ffmpeg -f concat -safe 0 -i "$FILELIST" -c copy "$TMPDIR/stitched.mp3" 2>/dev/nu
 # Apply denoising
 echo "Applying denoising filter..."
 ffmpeg -i "$TMPDIR/stitched.mp3" \
-  -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w" \
+  -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w,loudnorm=I=-16:TP=-1.5:LRA=11" \
   "$OUTPUT" 2>/dev/null
 
 if [ -s "$OUTPUT" ]; then

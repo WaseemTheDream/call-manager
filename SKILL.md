@@ -265,7 +265,7 @@ Sentence stitching fixes all of these by giving each sentence its own generation
 3. Generate silence gap: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1.2 -q:a 9 -acodec libmp3lame silence.mp3`
 4. Build file list alternating sentences and silence gaps (no silence after last sentence)
 5. Concatenate: `ffmpeg -f concat -safe 0 -i filelist.txt -c copy output.mp3`
-6. Apply denoising: `ffmpeg -i output.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w" final.mp3`
+6. Apply denoising and normalize volume: `ffmpeg -i output.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w,loudnorm=I=-16:TP=-1.5:LRA=11" final.mp3`
 
 ### Automated script
 

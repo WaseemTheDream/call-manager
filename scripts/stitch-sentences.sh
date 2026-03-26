@@ -21,7 +21,7 @@ set -euo pipefail
 
 TEXT="${1:?Usage: stitch-sentences.sh <text> <output_file> [silence_duration]}"
 OUTPUT="${2:?Usage: stitch-sentences.sh <text> <output_file> [silence_duration]}"
-SILENCE_DURATION="${3:-0.6}"
+SILENCE_DURATION="${3:-1.2}"
 
 MODEL="${TTS_MODEL:-eleven_multilingual_v2}"
 STABILITY="${TTS_STABILITY:-0.55}"

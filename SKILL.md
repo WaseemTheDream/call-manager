@@ -262,7 +262,7 @@ Sentence stitching fixes all of these by giving each sentence its own generation
 2. Generate each sentence via ElevenLabs TTS API with **cloned voice settings**:
    - model: `eleven_multilingual_v2`
    - stability: 0.55, similarity_boost: 0.9, style: 0.4, speed: 0.85
-3. Generate silence gap: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 0.6 -q:a 9 -acodec libmp3lame silence.mp3`
+3. Generate silence gap: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1.2 -q:a 9 -acodec libmp3lame silence.mp3`
 4. Build file list alternating sentences and silence gaps (no silence after last sentence)
 5. Concatenate: `ffmpeg -f concat -safe 0 -i filelist.txt -c copy output.mp3`
 6. Apply denoising: `ffmpeg -i output.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=15:nt=w" final.mp3`

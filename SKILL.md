@@ -45,6 +45,24 @@ that isn't associated with a specific character or persona.
 | Speed | 1.0 |
 | Technique | Standard (single-shot generation) |
 
+### Profile: Lexi (Co-Host / Secondary Voice)
+
+Use for multi-voice content where Lexi is the co-host or secondary speaker (e.g., daily
+briefings, dialogues, dual-host podcasts).
+
+| Setting | Value |
+|---|---|
+| Voice ID | `cgSgspJ2msm6clMCkdW9` (Jessica — Playful, Bright, Warm) |
+| Model | `eleven_turbo_v2_5` |
+| Stability | 0.5 |
+| Similarity boost | 0.75 |
+| Speed | 1.0 |
+| Technique | Standard (single-shot generation) |
+
+**Character notes:** Young, energetic, Gen-Z energy. Playful and witty with confident takes.
+Write her dialogue casually — "OK that's wild", "Love that", natural reactions. She's a
+podcast co-host, not a newsreader. Pairs well with Ren (Will) as the relaxed anchor.
+
 ### Profile: Cloned Voice (Character Persona)
 
 Use for any content delivered in a **cloned voice** (e.g., Steve Jobs quotes, celebrity
@@ -197,6 +215,49 @@ Save transcripts following the privacy model in `references/call-privacy.md`.
 DELETE https://api.vapi.ai/call/<call-id>
 Authorization: Bearer <VAPI_API_KEY>
 ```
+
+---
+
+## Procedure: Generate Multi-Voice Message
+
+**NEW:** Generate audio with multiple voices/segments (e.g., Ren + Lexi dialogue, intro + main content).
+
+Use this for:
+- Daily briefings with multiple hosts
+- Dialogue-style content (Q&A, interviews)
+- Intro/outro segments with different voices
+- Character conversations
+
+### Step 1: Create segments file
+
+```json
+[
+  {"voice": "bIHbv24MWmeRgasZH58o", "text": "Good morning! This is Ren with today's market brief."},
+  {"voice": "cgSgspJ2msm6clMCkdW9", "text": "And I'm Lexi with the crypto update."},
+  {"voice": "bIHbv24MWmeRgasZH58o", "text": "Bitcoin is trading at $97,000, up 2% overnight..."}
+]
+```
+
+### Step 2: Generate multi-voice audio
+
+```bash
+ELEVENLABS_API_KEY="<key>" \
+python3 ~/.openclaw/workspace/skills/call-manager/scripts/multi-voice-tts.py \
+  segments.json output.mp3
+```
+
+Optional environment variables:
+- `TTS_MODEL` — ElevenLabs model (default: eleven_turbo_v2_5)
+- `TTS_STABILITY` — Voice consistency (default: 0.5)
+- `TTS_SIMILARITY` — Voice matching (default: 0.75)  
+- `TTS_SPEED` — Playback speed (default: 1.0)
+- `SILENCE_GAP` — Seconds between voices (default: 0.8)
+
+### Step 3: Convert and deliver
+
+For WhatsApp: `ffmpeg -y -i output.mp3 -c:a libopus -b:a 64k -ar 48000 -ac 1 output.ogg`
+
+For Slack: Use the 3-step file upload API with the MP3.
 
 ---
 
